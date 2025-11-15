@@ -18,13 +18,13 @@ An AI program for detecting suspicious (alert) bank accounts.
 
 為了模擬真實預測場景並避免資料洩漏，我們採用了 **Plan B 訓練策略**：
 
-### ✔ 特徵一致性  
+### 特徵一致性  
 使用全部交易資料（包含預測帳戶）建立特徵。
 
-### ✔ 標籤隔離  
+### 標籤隔離  
 預測帳戶的標籤在訓練中被全部設為 NaN，避免洩漏。
 
-### ✔ 結構完整性  
+### 結構完整性  
 保留完整圖結構，使模型仍能利用其鄰居資訊。
 
 ---
@@ -96,7 +96,7 @@ pip install -r requirements.txt
 
 ---
 
-# ✅ 方式 A：一鍵式執行（trainv4_SAGE.py 已含預處理）
+# 方式 A：一鍵式執行（trainv4_SAGE.py 已含預處理）
 
 ### **Step 1 — 預處理 + 訓練（自動完成）**
 python Model/trainv4_SAGE.py
@@ -115,7 +115,7 @@ python Model/predictv4_SAGE.py
 --use_planb
 ---
 
-# ✅ 方式 B：分階段執行（更透明，可查看每階段輸出）
+# 方式 B：分階段執行（更透明，可查看每階段輸出）
 
 ---
 
@@ -154,13 +154,13 @@ python Model/predictv4_SAGE.py
 
 ---
 
-# ⭐ 重要補充：兩種執行流程「效果完全相同」
+# 重要補充：兩種執行流程「效果完全相同」
 
 無論你選擇：
 
-### ✔ **A. 執行 trainv4_SAGE.py（整合版）**  
+### **A. 執行 trainv4_SAGE.py（整合版）**  
 或  
-### ✔ **B. 執行 preprocessing.py → train.py → predictv4_SAGE.py（分段版）**
+### **B. 執行 preprocessing.py → train.py → predictv4_SAGE.py（分段版）**
 
 最終得到的：
 
