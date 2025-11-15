@@ -149,7 +149,27 @@
 
 ---
 
-## 使用範例 (Usage Example)
+## 使用範例 (已執行preprocessing.py)
+
+```bash
+# 執行 Plan B 模式訓練
+# (需提供 predicts 參數)
+
+python train.py \
+    --transactions Data/acct_transaction.csv \
+    --alerts Data/acct_alert.csv \
+    --predicts Data/acct_predict.csv \
+    --out_dir outputv4_SAGE \
+    --lr 0.0005 \
+    --hidden 1024 \
+    --dropout 0.5 \
+    --batch_size 512 \
+    --epochs 180 \
+    --use_planb
+
+```
+
+## 使用範例 (含預處理訓練)
 
 ```bash
 # 執行 Plan B 模式訓練
@@ -166,3 +186,5 @@ python trainv4_SAGE.py \
     --batch_size 512 \
     --epochs 180 \
     --use_planb
+
+
