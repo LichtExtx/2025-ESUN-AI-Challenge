@@ -1,125 +1,159 @@
-# 模型訓練腳本 (trainv4_SAGE.py)
+# 模型訓練腳本 (`trainv4_SAGE.py`)
 
-本腳本為 2025 E-SUN AI 挑戰賽的核心模型訓練程式。它負責從原始交易資料中學習並建立一個 GraphSAGE（v4 特徵版）模型。
+本腳本為 **2025 E-SUN AI 挑戰賽** 的核心模型訓練程式，負責使用 **GraphSAGE（v4 版）** 對帳戶交易圖進行訓練，並輸出可供 `predictv4_SAGE.py` 使用的完整模型資料夾（Model Artifacts Directory）。
 
-此腳本的最終產出是一個包含所有必要檔案的模型目錄 (Model Artifacts Directory)，該目錄將被 predictv4_SAGE.py 腳本用於執行預測。
+---
 
 ## 關鍵依賴 (Key Dependencies)
-1. Python 套件:
-    * pandas, numpy, scikit-learn (for joblib, RobustScaler)
-    * torch
-    * torch_geometric: 核心的圖神經網路函式庫。
 
-2. 原始資料檔案 (Raw Data Files):
-    * 訓練腳本需要 acct_transaction.csv, acct_alert.csv，以及在 Plan B 模式下的 acct_predict.csv。
+### 1. Python 套件
+* pandas, numpy  
+* scikit-learn（joblib, RobustScaler）  
+* torch  
+* torch_geometric（圖神經網路核心函式庫）
+
+### 2. 原始資料檔案
+模型訓練腳本需使用：
+* `acct_transaction.csv`
+* `acct_alert.csv`
+* （Plan B）`acct_predict.csv`
+
+---
 
 ## 訓練工作流程 (Training Workflow)
-本腳本執行時，會依序完成以下步驟：
 
-1. 載入資料 (Load Data): 讀取 transactions (交易資料)、alerts (標籤)、以及 predicts (預測清單，Plan B 模式使用)。
+執行本腳本後將依序完成：
 
-2. 建立索引 (Build Index): 建立 id2idx，將所有帳戶 ID 映射到唯一的節點索引。
+1. **載入資料 (Load Data)**  
+   讀取 `transactions`、`alerts`，以及（Plan B）`predicts`。
 
-3. 特徵工程 (Feature Engineering): 呼叫 agg_account_features，在完整的交易資料上計算所有帳戶的特徵（包含外幣特徵）。
+2. **建立索引 (Build Index)**  
+   建立 `id2idx` 將帳戶 ID 映射至節點索引。
 
-4. 標籤分配 (Label Assignment - Plan B):
+3. **特徵工程 (Feature Engineering)**  
+   呼叫 `agg_account_features` 計算帳戶特徵（含外幣特徵）。
 
-*   關鍵步驟: 如果啟用了 --use_planb，在 predicts 清單中的帳戶，其標籤會被設為 NaN (缺失值)，因此它們不會被劃分到訓練集或驗證集中。
+4. **標籤處理 (Label Assignment - Plan B)**  
+   * 若啟用 `--use_planb`：  
+     → `predicts` 清單內所有帳戶的標籤被設為 **NaN**（訓練及驗證均不使用）。
 
-5. 建立圖結構 (Build Graph):
+5. **建立圖結構 (Build Graph)**  
+   * 使用交易紀錄建立 `edge_index`  
+   * 計算 `pagerank_approx`, `in_degree` 等圖特徵並加入帳戶特徵
 
-*   根據完整的交易資料建立圖的邊 (edge_index)。
+6. **特徵處理 (Feature Processing)**  
+   * 移除 `FEATURES_TO_REMOVE`  
+   * 使用 `RobustScaler` 進行 `fit` + `transform`
 
-*   計算圖特徵 (如 pagerank_approx, in_degree) 並與帳戶特徵合併。
+7. **儲存前置模型資料 (Save Artifacts)**  
+   * 儲存 `scaler.joblib`, `feature_columns.json`, `id2idx.json`
 
-6. 特徵處理 (Feature Processing):
+8. **劃分資料集 (Split Data)**  
+   * 使用 `trainable_mask`  
+   * 進行分層抽樣產生 `train_mask.npy`, `val_mask.npy`
 
-*   移除 FEATURES_TO_REMOVE 列表中的冗餘特徵。
+9. **模型訓練 (Model Training)**  
+   * 初始化 `EnhancedGraphSAGEModel`  
+   * AdamW 優化器  
+   * FocalLoss  
+   * 使用 `NeighborLoader` 進行 mini-batch 訓練  
+   * 驗證使用 `evaluate_with_auprc`  
+   * 根據最高 F1-Score 儲存最佳模型  
+   * 內含 early stopping（`patience`）與 ReduceLROnPlateau
 
-*   使用 RobustScaler 對最終的特徵集進行擬合 (fit) 與轉換 (transform)。
+10. **儲存訓練摘要 (Save Summary)**  
+    儲存 `training_summary.json`：  
+    * F1, AUPRC  
+    * best_threshold  
+    * 模型超參數  
+    * FocalLoss 參數
 
-7. 儲存模型檔案 (Save Artifacts):
+---
 
-*   立即儲存 scaler.joblib (已擬合), feature_columns.json (最終特徵列表), 和 id2idx.json。
+## Plan B 模式 (`--use_planb`)
 
-8. 劃分資料集 (Split Data): 根據 trainable_mask (在 Plan B 模式下會排除預測帳戶) 進行分層抽樣，劃分 train_mask 和 val_mask。
+此模式是比賽核心策略，確保預測帳戶不會洩漏標籤資訊。
 
-9. 模型訓練 (Model Training):
+### 1. 特徵一致性 (Feature Consistency)
+* 使用 **完整交易資料**（不論帳戶是否為預測對象）計算特徵  
+* 確保所有帳戶的特徵來源一致
 
-*   初始化 EnhancedGraphSAGEModel、AdamW 優化器和 FocalLoss。
+### 2. 標籤隔離 (Label Isolation)
+* `acct_predict.csv` 內所有帳戶 → 標籤設為 NaN  
+* 這些帳戶不會被分到 train/val  
+* 模型訓練 **永不會看到這些帳戶的真實標籤**
 
-*   使用 NeighborLoader 進行小批次 (mini-batch) 訓練。
+### 3. 圖結構完整性 (Graph Integrity)
+* 預測帳戶依然會被保留於圖中  
+* GNN 可透過鄰居採樣取得其周邊結構  
+* 但預測帳戶本身 **不參與 loss**
 
-*   使用 evaluate_with_auprc 評估驗證集，並根據 F1-Score 儲存最佳模型。
+---
 
-*   包含早停 (patience) 和學習率調度 (ReduceLROnPlateau)。
+## 結論
 
-10. 儲存摘要 (Save Summary): 將最佳指標 (F1, AUPRC, best_threshold) 和模型超參數存入 training_summary.json。
+**Plan B 模式會讓模型在「不知道預測帳戶標籤」的前提下，仍能利用完整的圖訊息與特徵分布進行學習。**
 
-## "Plan B" 訓練模式 (--use_planb)
-這是此訓練腳本的關鍵模式，專為確保預測的公平性與一致性而設計。
-
-當啟用 --use_planb 時：
-
-1. 特徵一致性 (Feature Consistency):
-
-*   會使用全部的交易資料 (acct_transaction.csv) 來計算所有帳戶的特徵。
-
-*   這確保了「待預測帳戶」的特徵與「訓練帳戶」的特徵是在相同的資料基礎上計算的。
-
-2. 標籤隔離 (Label Isolation):
-
-*   acct_predict.csv 清單中的所有帳戶，其標籤會被強制設為 NaN。
-
-*   這導致它們在劃分訓練/驗證集時被排除在外 (trainable_mask = False)。
-
-*   結果: 模型在訓練過程中絕對不會看到預測帳戶的真實標籤（無論它們是否為警示帳戶）。
-
-3. 圖結構完整性 (Graph Integrity):
-
-*   在建立圖時，會保留預測帳戶與其他帳戶之間的所有邊。
-
-*   這允許 GNN 模型在訓練時，仍然可以透過鄰居採樣 (Neighbor Sampling) 來學習預測帳戶周圍的圖結構資訊，即使預測帳戶本身不參與 Loss 計算。
-
-## 結論： Plan B 模式訓練出的模型，是在不知道預測帳戶標籤的情況下，學習如何利用完整的圖結構和特徵分布。
+---
 
 ## 檔案說明 (File Definitions)
 
-1. 命令列參數 (Arguments)
-本腳本需要以下命令列參數作為輸入：
-參數,說明,範例
---transactions,(必要) 完整的交易資料 .csv 檔案。,Data/acct_transaction.csv
---alerts,(必要) 警示帳戶標籤 .csv 檔案。,Data/acct_alert.csv
---out_dir,(必要) 輸出模型檔案的目錄。,outputv4_SAGE/
---predicts,(Plan B 選用) 預測帳戶清單 .csv。,Data/acct_predict.csv
---epochs,(選用) 訓練輪數 (預設: 200),200
---lr,(選用) 學習率 (預設: 0.0005),0.0005
---hidden,(選用) GNN 隱藏層維度 (預設: 1024),1024
---num_layers,(選用) GNN 層數 (預設: 3),3
---dropout,(選用) Dropout 率 (預設: 0.5),0.5
---batch_size,(選用) 訓練批次大小 (預設: 512),512
---val_ratio,(選用) 驗證集比例 (預設: 0.2),0.2
---patience,(選用) 早停耐心值 (預設: 20),20
---use_planb,"(選用) 啟用 ""Plan B"" 標籤隔離模式",(無值)
+### 1. 命令列參數 (Arguments)
 
-2. 輸出檔案 (Output Artifacts)
---out_dir 參數指定的目錄將會產生以下檔案 (供 predictv4_SAGE.py 使用)：
+| 參數 | 說明 | 範例 |
+|------|------|------|
+| `--transactions` | (必要) 交易資料 CSV | Data/acct_transaction.csv |
+| `--alerts` | (必要) 標籤資料 CSV | Data/acct_alert.csv |
+| `--out_dir` | (必要) 模型輸出目錄 | outputv4_SAGE/ |
+| `--predicts` | (Plan B) 預測清單 | Data/acct_predict.csv |
+| `--epochs` | 訓練輪數（預設 200） | 200 |
+| `--lr` | 學習率（預設 0.0005） | 0.0005 |
+| `--hidden` | 隱藏層維度（預設 1024） | 1024 |
+| `--num_layers` | GraphSAGE 層數（預設 3） | 3 |
+| `--dropout` | Dropout 比例（預設 0.5） | 0.5 |
+| `--batch_size` | 訓練批次大小（預設 512） | 512 |
+| `--val_ratio` | 驗證集比例（預設 0.2） | 0.2 |
+| `--patience` | 早停耐心值（預設 20） | 20 |
+| `--use_planb` | 啟用 Plan B 模式 | 無值 |
 
-best_model.pth: 儲存驗證集 F1-Score 最高的模型權重 (state_dict)、最佳閾值 (best_threshold) 和當時的指標。
+---
 
-scaler.joblib: 已使用最終特徵集 (X_final) 擬合 (fit) 過的 RobustScaler 物件。
+## 2. 輸出檔案 (Output Artifacts)
 
-feature_columns.json: 一個 list，包含最終用於訓練的特徵欄位名稱及其順序。這是確保預測時特徵對齊的關鍵檔案。
+`--out_dir` 內將生成：
 
-id2idx.json: 帳戶 ID (str) 到圖節點索引 (Node Index) 的映射。
+* **best_model.pth**  
+  * 儲存最佳模型權重（`state_dict`）  
+  * best_threshold  
+  * 當次最佳 F1 / AUPRC
 
-training_summary.json: 包含訓練模式、最佳指標 (F1, AUPRC)、模型超參數和 Focal Loss 參數的 JSON 檔案。
+* **scaler.joblib**  
+  已 fit 完成的 `RobustScaler`，供預測端使用。
 
-feature_std.csv / feature_comparison.csv: (分析用) 特徵的標準差與警示/正常帳戶的均值對比。
+* **feature_columns.json**  
+  最終訓練使用的特徵欄位順序（預測時對齊必須一致）。
 
-使用範例 (Usage Example)
+* **id2idx.json**  
+  帳戶 ID → 節點索引映射表。
+
+* **training_summary.json**  
+  內容包含：
+  * 訓練模式  
+  * F1、AUPRC  
+  * best_threshold  
+  * 訓練參數  
+  * FocalLoss 設定
+
+* **feature_std.csv / feature_comparison.csv**  
+  （分析用）特徵標準差與警示/正常帳戶分布比較。
+
+---
+
+## 使用範例 (Usage Example)
+
+```bash
 # 執行 Plan B 模式訓練
-# (確保 `predicts` 參數已指定)
+# (需提供 predicts 參數)
 
 python trainv4_SAGE.py \
     --transactions Data/acct_transaction.csv \
