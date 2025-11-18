@@ -45,44 +45,78 @@ pip install -r requirements.txt
 
 # 3. 專案結構 (Project Structure)
 .
+
 ├── Data/
+
 │ ├── acct_transaction.csv # 完整交易紀錄
+
 │ ├── acct_alert.csv # 真實警示帳戶標籤
+
 │ └── acct_predict.csv # 需預測的帳戶清單
-│
+
 ├── Preprocessing/
+
 │ ├── preprocessing.py # 階段一：特徵工程
+
 │ ├── README.md
+
 │ └── processed_data/
+
 │ ├── X_scaled.npy
+
 │ ├── y_labels.npy
+
 │ ├── edge_index.npy
+
 │ ├── train_mask.npy
+
 │ ├── val_mask.npy
+
 │ ├── scaler.joblib
+
 │ ├── feature_columns.json
+
 │ └── id2idx.json
-│
+
+
 ├── Model/
+
 │ ├── train.py # 階段二：模型訓練
+
 │ ├── trainv4_SAGE.py # (整合版) 預處理 + 訓練
+
 │ ├── predictv4_SAGE.py # 預測腳本
+
 │ ├── README.md
+
 │ └── outputv4_SAGE/
+
 │ ├── best_model.pth
+
 │ ├── training_summary.json
+
 │ ├── scaler.joblib
+
 │ ├── feature_columns.json
+
 │ └── id2idx.json
-│
+
+
 ├── tools/
+
 │ ├── analyze_alert_timing.py
+
 │ ├── analyze_compare.py
+
 │ ├── tool_split_alert_total.py
+
 │ ├── analyze_account.py
+
 │ └── README.md
-│
+
+
 ├── requirements.txt
+
 └── README.md
 
 ---
