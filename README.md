@@ -4,7 +4,7 @@ An AI program for detecting suspicious (alert) bank accounts.
 
 # 1. 建模概述 (Modeling Overview)
 
-本專案旨在從帳戶的交易行為中偵測出潛在的警示帳戶。我們採用 **Graph Neural Network (GNN)**，並以 **GraphSAGE（v4 特徵版）** 作為核心模型。
+本專案旨在從帳戶的交易行為中偵測出潛在的警示帳戶。我們採用 **Graph Neural Network (GNN)**，並以 **GraphSAGE** 作為核心模型。
 
 此版本特別強化以下特徵工程：
 
@@ -112,7 +112,7 @@ python Model/predictv4_SAGE.py
 --use_planb
 ---
 
-# 方式 B：分階段執行（更透明，可查看每階段輸出）
+# 方式 B：分階段執行
 
 ---
 
@@ -138,7 +138,7 @@ python Model/train.py
 --epochs 180
 ---
 
-## **步驟三：預測 (Final Prediction)**
+## **步驟三：預測 (Stage 3)**
 
 python Model/predictv4_SAGE.py
 --transactions Data/acct_transaction.csv
@@ -151,7 +151,7 @@ python Model/predictv4_SAGE.py
 
 ---
 
-# 重要補充：兩種執行流程「效果完全相同」
+# 補充：兩種執行流程「效果完全相同」
 
 無論你選擇：
 
@@ -184,7 +184,7 @@ python Model/predictv4_SAGE.py
 - Loss：**Focal Loss (gamma=2)**  
 
 ### 資源需求
-- **GPU**：建議 nvidia 3060 以上規格  
+- **GPU**：建議 GeForce RTX 3060 系列 以上規格  
 - **CPU**：預處理階段依賴 CPU  
 - **RAM**：至少 4GB（需載入完整交易資料）
 
